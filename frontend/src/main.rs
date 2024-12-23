@@ -1,7 +1,13 @@
-use common::{ChatMessage, WebSocketMessage, WebSocketMessageType};
-use web_sys::HtmlTextAreaElement;
+use common::{WebSocketMessage, WebSocketMessageType};
+use message_list::MessageList;
+use send_dialog::SendDialog;
+use users_list::UsersList;
 use yew::prelude::*;
 use yew_hooks::use_websocket;
+
+mod message_list;
+mod send_dialog;
+mod users_list;
 
 fn main() {
     yew::Renderer::<App>::new().render();
@@ -11,8 +17,8 @@ fn main() {
 fn App() -> Html {
     let messages_handle = use_state(Vec::default);
     let messages = (*messages_handle).clone();
-    let new_message_handle = use_state(String::default);
-    let new_message = (*new_message_handle).clone();
+    let users_handle = use_state(Vec::default);
+    let users = (*users_handle).clone();
 
     let ws = use_websocket("ws://127.0.0.1:8000".to_string());
 
@@ -26,48 +32,31 @@ fn App() -> Html {
                     cloned_messages.push(msg);
                     messages_handle.set(cloned_messages);
                 }
-                WebSocketMessageType::UsersList => {}
+                WebSocketMessageType::UsersList => {
+                    let users = web_socket_message.users.expect("Missing users payload");
+                    users_handle.set(users);
+                }
             }
         }
     });
 
-    let cloned_new_message_handle = new_message_handle.clone();
-    let on_message_change = Callback::from(move |e: Event| {
-        let target = e.target_dyn_into::<HtmlTextAreaElement>();
-        if let Some(textarea) = target {
-            cloned_new_message_handle.set(textarea.value());
-        }
-    });
-
-    let cloned_new_message = new_message.clone();
     let cloned_ws = ws.clone();
-    let on_button_click = Callback::from(move |_: MouseEvent| {
-        cloned_ws.send(cloned_new_message.clone());
-        new_message_handle.set("".to_string());
+    let send_message_callback = Callback::from(move |msg: String| {
+        cloned_ws.send(msg.clone());
     });
 
     html! {
-        <div class="container">
+        <div class="container-fluid">
             <div class="row">
-                <div class="list-group">
-                {
-                    messages.iter().map(|m| html! {
-                        <div class="list-group-item list-group-item-action">
-                            <div class="d-flex w-100 justify-content-between">
-                                <h5>{m.author.clone()}</h5>
-                                <small>{m.created_at.format("%Y-%m-%d %H:%M:%S").to_string()}</small>
-                            </div>
-                            <p>{m.message.clone()}</p>
-                        </div>
-                    }).collect::<Html>()
-                }
+                <div class="col-sm-3">
+                    <UsersList users={users} />
+                </div>
+                <div class="col-sm-9">
+                    <MessageList messages={messages} />
                 </div>
             </div>
             <div class="row">
-                <div class="input-group">
-                    <textarea class="form-control" onchange={on_message_change} value={new_message}></textarea>
-                    <button type="submit" class="btn btn-primary" onclick={on_button_click}>{"Send"}</button>
-                </div>
+                <SendDialog send_message_callback={send_message_callback} />
             </div>
         </div>
     }
