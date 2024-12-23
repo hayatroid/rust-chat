@@ -1,3 +1,10 @@
-fn main() {
-    println!("Hello, world!");
+#[rocket::main]
+async fn main() {
+    let _ = rocket::build()
+        .mount("/", rocket::routes![chat])
+        .launch()
+        .await;
 }
+
+#[rocket::get("/")]
+fn chat() {}
